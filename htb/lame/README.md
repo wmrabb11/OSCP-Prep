@@ -1,0 +1,18 @@
+# user
+  - nmap directory for initial scans
+  - anonymous ftp, ftp version is old (2.3.4) -> look up cve?
+    - [yep, there's even a metasploit module for it](https://www.rapid7.com/db/modules/exploit/unix/ftp/vsftpd_234_backdoor/)
+    - msfconsole gives us a "exploit completed, but no session was created message"
+    - tried doing the exploit manually too (telneting in and using "USER foo:)" and "PASS bar"), but to no avail
+    - start looking at other services for now
+  - ssh version is also old (4.7p1)
+    - don't see any glaring cve's/exploits for this at first glance, moving on
+  - ports 139 and 445 -> smb enumeration time
+    - check the version first, google 'smbd 3.0.20-Debian cve'
+    - found [this](https://www.exploit-db.com/exploits/16320), a metasploit module for the same version of smb
+    - looks like it'll give us code execution, so try it out
+    - `use exploit/multi/samba/usermap\_script`
+    - `set RHOST 10.10.10.3`
+    - `run`
+    - and you get a root shell lmao
+  - user & root pwned
