@@ -4,7 +4,7 @@
   - [x] lame
   - [ ] brainfuck
   - [ ] shocker
-  - [ ] bashed
+  - [x] bashed
   - [ ] nibbles
   - [ ] beep
   - [ ] cronos
