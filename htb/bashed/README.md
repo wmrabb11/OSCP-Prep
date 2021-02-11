@@ -1,0 +1,43 @@
+# user:
+  - nmap directory for initial scans
+  - just port 80 open, starting all ports in the background while we check out the site
+  - THE WEBSITE
+    - apache server, pretty generic pages
+    - mention "phpbash" a lot, mentioning that the creator "developed it on this server"
+    - so if we can find that script, probable code execution
+    - we don't know what it's called now, but in one of the screenshots it's on "10.10.10.27/uploads/phpbash.php"
+    - in the tab title of that same page, we see "http://10.10..hpbash3.php"
+    - so we know it's probably called either "phpbash.php" or "phpbash3.php"
+    - not in the top level directory and not in '/uploads'
+    - also a link to the [authors github](https://github.com/Arrexel/phpbash) on the page 
+    - I tried guessing a few times, but ran gobuster in the background
+    - it found images, uploads, php, css, dev, js, fonts (all returned 301's)
+    - LOL it was at '10.10.10.68/dev/phpbash.php'
+    - now we have a shell as www-data on the site
+  - PHPBASH
+    - catting out /etc/passwd -> users "arrexel" and "scriptmanager"
+    - go into arrexel's home directory, the permissions are loose so we can read user.txt
+    - escalate the shell to a real bash shell (upload a php rev shell to /uploads)
+  - user pwned
+
+# root:
+  - REV SHELL as www-data
+    - "scripts" folder in '/', owned by scriptmanager so we can't see it
+    - nothing interesting in either users home directory
+    - 'sudo -l' shows we can run anything as scriptmanager without a password
+    - lets try just giving ourselves a shell as scriptmanager `sudo -u scriptmanager bash`
+    - now we are scriptmanager
+  - SCRIPTMANAGER
+    - 'sudo -l' prompts for a password that we don't have
+    - remember the scripts folder
+    - python script that just writes something to a file that's only writable to by root
+    - the timestamp on 'test.txt' is today -> it's being updated so we know it's being run
+    - and only root has write perms on the test.txt file, so it's running as root
+    - maybe we can change the script and pop a root shell
+    - the nano editor was not working properly (rev shells amirite)
+    - let's append some stuff to the end to see if it works?
+    - tried the "shell.py" one-liner locally and it works so let's check on the box
+    - `echo '*contents of shell.py*' >> test.py`
+    - wait for it..
+    - root shell caught :)
+  - root pwned
