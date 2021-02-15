@@ -1,4 +1,4 @@
-# user:
+# user
   - nmap directory for initial scans
   - just port 80 open, starting all ports in the background while we check out the site
   - THE WEBSITE
@@ -20,7 +20,7 @@
     - escalate the shell to a real bash shell (upload a php rev shell to /uploads)
   - user pwned
 
-# root:
+# root
   - REV SHELL as www-data
     - "scripts" folder in '/', owned by scriptmanager so we can't see it
     - nothing interesting in either users home directory
