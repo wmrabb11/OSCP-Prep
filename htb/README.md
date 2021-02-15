@@ -5,7 +5,7 @@
   - [ ] brainfuck
   - [ ] shocker
   - [x] bashed
-  - [ ] nibbles
+  - [x] nibbles
   - [ ] beep
   - [ ] cronos
   - [ ] nineveh
