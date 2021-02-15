@@ -1,0 +1,40 @@
+# user
+  - nmap directory for initial scans
+  - SSH, website, and HTTPS site as well
+  - domain name: valentine.htb -> /etc/hosts
+  - WEBSITE on PORT 80
+    - apache server
+    - just an image, nothing interesting in the source
+    - looks like PHP because of "X-Powered-By: PHP/5.3.10-1ubuntu3.26" response header
+    - gobuster found '/dev'
+      - notes and a "hype_key" -> series of hex bytes
+      - in the notes: 'fix decoder/encoder before going live'
+      - 'make sure encoding/decoding is only done client-side'
+      - 'don't use the decoder/encoder until any of this is done'
+    - gobuster also found '/encode' and '/decode'
+      - looks like it's just base64 encoding/decoding the input
+      - tried playing around with encoding/decoding the hype key we found, but gained nothing
+      - convert the hex into ASCII
+      - found it's a SSH key, but it's pw protected -> ssh2john to yield "id_rsa.hash"
+      - tried cracking it a few times, but to no avail -> keep looking
+  - WEBSITE on PORT 443
+    - same picture as on normal website, nothing added to source or anything
+  - Ok so we have an SSH key that's password protected, a base64 encoder/decoder, we don't know any users so even if we could crack the key we might not be able to log in without knowing a user (we could guess, but no guarantee)
+  - ssl-cert is expired (2019-02-06), but I think that's just because the box is old and retired
+  - google reverse image search the picture on the landing page -> result is the "heartbleed" vulnerability
+    - security bug in the OpenSSL library, makes sense because there's also an https version of the site (and the box is called "valentine")
+  - try to find a PoC, found [this](https://github.com/sensepost/heartbleed-poc)
+  - `nmap --script=ssl-heartbleed -p 443 valentine.htb` -> it's vulnerable!
+  - download and try out the PoC
+  - found some string in the output of the PoC: `$text=aGVhcnRibGVlZGJlbGlldmV0aGVoeXBlCg==` -> base64 decoded = "heartbleedbelievethehype"
+  - possibly the password for SSH or the SSH key?
+  - it's the password for the SSH key, and now you can log in as user "hype"
+  - user pwned
+
+# root
+  - `sudo -l` prompts for a password, and doesn't work with the SSH key password
+  - tmux is running as root '/usr/bin/tmux -S /.devs/dev_sess'
+  - looking at the tmux man page, -S specifies a "socket path", to use a different tmux socket than default
+  - you can attach to the tmux session with `tmux -S /.devs/dev_sess` or `tmux -S /.devs/dev_sess a -t 0`
+  - the tmux session is running as root
+  - root pwned

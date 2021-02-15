@@ -13,7 +13,7 @@
   - [ ] solidstate
   - [ ] kotarak
   - [ ] node
-  - [ ] valentine
+  - [x] valentine
   - [ ] poison
   - [ ] sunday
   - [ ] tartarsauce
