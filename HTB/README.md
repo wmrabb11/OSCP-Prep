@@ -7,7 +7,7 @@
   - [x] bashed
   - [x] nibbles
   - [ ] beep
-  - [ ] cronos
+  - [x] cronos
   - [ ] nineveh
   - [ ] sense
   - [ ] solidstate

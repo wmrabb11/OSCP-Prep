@@ -1,0 +1,75 @@
+# user
+  - nmap directory for initial scans
+  - ports 22, 53 (DNS), and 80 open (nothing new after all-ports scan)
+  - Website (port 80)
+    - the apache2 ubuntu default page is all we get
+    - starting a gobuster scan with the "big.txt" wordlist from "/usr/share/wordlists/dirb"
+    - .htpasswd and .htaccess -> 403
+    - I'm thinking we need to find a domain (bc just going to IP gives us default page; and this box is a DNS server)
+    - yep, i added "cronos.htb" as a guess (they're often the name of the box + ".htb") and it worked, now we have an actual website to look at
+    - pretty empty page, just some links to docs about "laravel"
+    - laravel is a webapp framework, probably safe to assume it's being used on this site 
+    - cronos.htb is setting cookies for XSRF-TOKEN and laravel\_session so laravel is def being used
+    - robots.txt: "User-Agent: \*\n Disallow"
+    - alright, so we know it's running laravel and a DNS server
+    - searchsploit for laravel, find 'PHP Laravel Framework 5.5.40 / 5.6.x < 5.6.30 - token Unserialize Remote Command Execution (Metasploit)' -> that's interesting
+    - get "Exploit completed, but no session was created". Tried playing around with it but couldn't get it to work, think I need the "APP_KEY" from the .env file
+      - Most info I saw online when looking at this CVE say that you need the app key for this to work properly
+    - hit a bit of a dead-end on the website, time to start enumerating DNS
+  - DNS (port 53)
+    - `nslookup cronos.htb 10.10.10.13` -> shows that cronos.htb resolves to 10.10.10.13, which confirms my guess
+    - `dig @10.10.10.13 cronos.htb` -> we also see a 'ns1.cronos.htb' -> add to /etc/hosts
+    - doing a zone transfer -> we find `admin.cronos.htb` and `www.cronos.htb` -> add to /etc/hosts
+      - command for the zone transfer: `dig @ns1.cronos.htb axfr cronos.htb`
+    - ns1.cronos.htb -> default apache page, www.cronos.htb -> same as cronos.htb
+  - ADMIN (admin.cronos.htb)
+    - tried a few basic combos "admin:admin", "admin:password" but to no avail
+    - start a gobuster scan
+      - didn't end up finding much that we can look at
+    - doesn't seem to be vulnerable to basic SQLi (tried like `' or 1=1--`, just a single tick), maybe try sqlmap?
+      - Copy the login reqest from burp over to a file 'login.req'
+      - got a redirect to "/welcome.php" while sqlmap is running
+      - username field is injectable (time-based blind)
+      - payload that sqlmap identified: `username=admin' AND (SELECT 1433 FROM (SELECT(SLEEP(5)))Mifr) AND 'MRRJ'='MRRJ&password=password`
+      - definitely getting injection -> try logging in with that username and it hangs for 5 seconds before resuming
+      - BUT the payload doesn't work, so I wanted to get the exact payload that sqlmap used to get the redirect
+      - ran sqlmap again, but with `-v3` for more verbose logging, this will display each payload it tries
+      - `admin' ORDER BY 1-- -` -> so maybe not a time-based blind injection, but this will get us logged in
+    - We get logged in -> "Net Tool v0.1"
+    - can run "traceroute" or "ping" (options from a drop-down box), and we're given an input field for the host to ping
+    - pinged my box, tcpdump showed that the ping went through
+    - I'm thinking either we can change the program being run (through a post param?), or it's vulnerable to injection
+    - YEP, we can change the command (these are the post params from burp): `command=ping+-c+1&host=10.10.14.33`
+    - We also have command injection. trying command traceroute with the host as `8.8.8.8; ls` -> displays the directory on the page
+    - `*ip*; which nc` -> /bin/nc -> netcat is installed, but might not be the right version for using that as our rev shell. let's try it out
+    - tried it, and it just refreshes the page with no command output. I'd imagine it's because they have some filtering or the wrong netcat version
+    - we do have python installed, so let's try a python rev shell -> WORKED
+    - payload -> start a nc listener, just add a semicolon to the beginning of the "payload" file in this repo, slap it into the command input box, hit execute and catch a shell
+  - www-data shell
+    - catting out 'config.php' gives us some DB creds
+    - found the line of code that allowed us to get command execution: `exec($command.' '.$host, $output, $return);` (nothing too surprising lol)
+    - found the "app_key" as mentioned earlier for the MSF module
+    - tried out the exploit again, still got "exploit complete, but no session was created"
+    - other than that, not much interesting in noulis home dir (except for a bunch of files in the composer cache)
+  - user 'noulis' found in the home directory. we can read 'user.txt' as www-data 
+  - user pwned
+
+# root
+  - we're still www-data, but I'm pretty sure that's "user", because we could read the user.txt file
+  - no 'sudo -l' (asks for a password we don't have)
+  - tried out all the creds found to su to noulis, but none worked
+  - logging into the database, find the username and hash for the admin site
+  - `https://hashes.com/en/decrypt/hash` -> find the hash is "1327663704"
+  - running linpeas to see what all we're working with
+  - found port 953 open on localhost (interesting? not sure what this port does off the top of my head)
+  - interesting cronjob found: `* * * * *       root    php /var/www/laravel/artisan schedule:run >> /dev/null 2>&1`
+    - running artisan(?) as root always lol
+    - the path is being set before: `PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin` (unlikely path injection)
+    - RTFD on [laravel/artisan](https://laravel.com/docs/8.x/scheduling)
+    - basically, this cronjob will run any scheduled commands as root (and it runs every minute, every hour, every day, every week)
+    - and we have write access -> copy it over locally, use docs to figure out how to run system calls, and replace the old Kernel.php with your malicious one
+  - plan worked as expected!
+    - used a Python rev shell (because I know that works, since that's how we got the www-data shell), you can find the code in `Kernel.php`
+    - start nc listener, use SimpleHTTPServer to host your Kernel.php file, use wget on the box to pull it locally, replace the old Kernel.php
+    - wait 1 min or less and catch a root shell
+  - root pwned
